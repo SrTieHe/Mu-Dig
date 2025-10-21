@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Muro Digital — O Muro mais valioso da internet</title>
+<style>
+    /* ------------------------------------------------ */
+    /* ESTILOS CSS REVISADOS E REFORÇADOS */
+    /* ------------------------------------------------ */
+    :root {
+        --ui-bg: #0f1720;
+        --panel: #0b1220cc;
+        --accent: #10b981; /* Verde Principal (Botão Comprar) */
+        --muted: #bfc7cf;
+        --reset-color: #60a5fa; /* Novo Azul para Reset */
+    }
+    
+    html, body {
+        height: 100%;
+        margin: 0;
+        font-family: Inter, Segoe UI, Arial, sans-serif;
+        background: linear-gradient(180deg, #071021, #0f1720);
+        color: #e6eef6;
+        overflow-x: hidden;
+    }
+
+    #app {
+        display: flex;
+        height: 100vh;
+        width: 100%;
+    }
+    
+    #left {
+        flex: 1; 
+        position: relative;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+    }
+    
+    #canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #ffffff;
+        display: block;
+        cursor: grab; /* Mão de arrasto */
+    }
+    
+    #canvas:active {
+        cursor: grabbing;
+    }
+    
+    /* Cursor de link quando estiver sobre um bloco que pode ser clicado */
+    #canvas.link-cursor {
+        cursor: pointer;
+    }
+    
+    #ui {
+        width: 360px;
+        min-width: 300px;
+        padding: 16px;
+        box-sizing: border-box;
+        background: var(--panel);
+        backdrop-filter: blur(6px);
+        overflow-y: auto;
+    }
+
+    h1 {
+        margin: 0 0 8px 0;
+        font-size: 18px;
+        color: var(--accent);
+    }
+    
+    .stat {
+        margin: 8px 0;
+        color: var(--muted);
+        font-size: 14px;
+    }
+    
+    label {
+        display: block;
+        margin: 8px 0 4px;
+        color: #cfe6d7;
+    }
+    
+    .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+    
+    button {
+        background: var(--accent);
+        border: 0;
+        padding: 8px 10px;
+        border-radius: 6px;
+        color: #042018;
+        cursor: pointer;
+        flex-grow: 1; 
+    }
+    
+    button.reset-ghost {
+        background: transparent;
+        border: 1px solid var(--reset-color);
+        color: var(--reset-color);
+        transition: background-color 0.2s;
+    }
+
+    button.reset-ghost:hover {
+        background-color: rgba(96, 165, 250, 0.1); 
+    }
+    
+    input,
+    select {
+        width: 100%;
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: transparent;
+        color: var(--muted);
+    }
+    
+    small {
+        color: #9fb3a2;
+    }
+    
+    #legend {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .badge {
+        padding: 6px 8px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.03);
+        font-size: 13px;
+    }
+    
+    footer {
+        position: absolute;
+        left: 12px;
+        bottom: 12px;
+        color: #9fb3a2;
+        font-size: 13px;
+    }
+    
+    #selection-info {
+        font-size: 14px;
+        color: #ffc107; 
+        margin: 8px 0;
+        padding: 4px;
+        border: 1px dashed rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        text-align: center;
+    }
+    
+    /* ------------------------------------------------ */
+    /* ESTILO PARA O MOSTRADOR FLUTUANTE (TOOLTIP) */
+    /* ------------------------------------------------ */
+    #tip-url {
+        position: absolute;
+        bottom: 35px; 
+        left: 10px;
+        background: rgba(0, 0, 0, 0.85);
+        color: white;
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 13px;
+        max-width: 90%;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        z-index: 1000; 
+        pointer-events: none; 
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+
+    #tip-url.visible {
+        opacity: 1;
+    }
+</style>
+</head>
+<body>
+<div id="app">
+    <div id="left">
+        <canvas id="canvas"></canvas>
+        <div id="tip-url"></div> 
+        <footer>Zoom: mousewheel • Arraste para navegar • Shift+Arraste para selecionar</footer>
+    </div>
+    <div id="ui">
+        <h1>Muro Digital — O Muro mais valioso da internet</h1>
+        <div class="stat" id="stats">Carregando...</div>
+
+        <label>Preço por pixel</label>
+        <div class="row"><div class="badge">R$ 1,00</div><div class="badge" id="totalPixelsBadge">— pixels</div></div>
+        
+        <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,0.04)">
+        
+        <div id="selection-info">Selecione uma área (Shift + Arrastar)</div>
+
+        <small style="color:var(--accent); font-weight: bold;">
+            COMO COMPRAR SUA ÁREA:
+        </small>
+        <small>
+            <br/>1. Use **Shift + Arrastar** no mural para selecionar o bloco de pixels.
+            <br/>2. O pedido mínimo é de **150 pixels**.
+            <br/>3. Preencha os campos abaixo.
+        </small>
+
+        <label style="margin-top: 12px;">Dados do Pedido</label>
+        <input id="buyerName" placeholder="Seu nome ou empresa (Obrigatório)" />
+        <input id="imageUrl" placeholder="URL da Imagem OU Link de Site (Opcional)" />
+        <div style="margin-top:8px" class="row">
+            <button id="buyBlockBtn">Criar Pedido de Compra (Enviar Email)</button>
+        </div>
+        
+        <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,0.04)">
+
+        <label>Ferramentas</label>
+        <div class="row">
+            <button id="resetBtn" class="reset-ghost" style="flex-grow: 0;">Reset Visual (Limpar Seleção)</button>
+        </div>
+
+        <div id="legend">
+            <div class="badge">Livre: branco</div>
+            <div class="badge">Vendido: colorido/imagem</div>
+            <div class="badge">Selecionado: borda preta</div>
+        </div>
+
+        <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,0.04)">
+
+        <small>Dimensão do grid: <span id="gridInfo">—</span></small><br/>
+        <small>Pixels vendidos: <b id="soldCount">0</b></small><br/>
+    </div>
+</div>
+
+<script>
+(() => {
+    // ------------------------------------
+    // 1. CONFIGURAÇÃO 
+    // ------------------------------------
+    const GRID_W = 1000;
+    const GRID_H = 2500;
+    const TOTAL_PIXELS = GRID_W * GRID_H;
+    const PRICE_PER_PIXEL = 1.00;
+    const MIN_PIXEL_ORDER = 150; 
+
+    /**
+     * Objeto de Dados de Proprietários: VOCÊ EDITA ESTE OBJETO MANUALMENTE
+     * * FORMATO:
+     * "bloco1": { 
+     * x: (Coordenada X inicial), 
+     * y: (Coordenada Y inicial), 
+     * w: (Largura), 
+     * h: (Altura), 
+     * name: "Nome da Marca", 
+     * imageUrl: "URL da imagem (ex: .png ou .jpg) | Opcional, se vazio usa cor", 
+     * websiteUrl: "Link do site para o CLIQUE (Opcional)"
+     * }
+     */
+    let OWNERS_DATA = {
+        // =================================================================
+        // BLOCOS DE VENDA (PREENCHA AQUI!)
+        // Lembre-se de trocar as URLs de exemplo pelas URLs reais do cliente.
+        // =================================================================
+        "colorado-sul-1": { 
+            x: 31, 
+            y: 7, 
+            w: 62, 
+            h: 39, 
+            name: "Colorado Sul", 
+            imageUrl: "https://images.pexels.com/photos/33843056/pexels-photo-33843056.jpeg", // 1. A URL que renderiza a imagem no mural:
+            websiteUrl: "https://www.coloradosul.com.br" // 2. O link do site que será exibido no tooltip:
+        },
+        "cafeteria-alfa-1": { 
+            x: 100,           
+            y: 50,            
+            w: 20,            
+            h: 10,            
+            name: "Cafeteria Alfa", 
+            imageUrl: "https://cdn.pixabay.com/photo/2024/02/23/22/13/ai-generated-8592889_640.jpg", // Vazio, irá mostrar apenas a cor
+            websiteUrl: "https://cafeteria.com.br"
+        } 
+    }; 
+
+    // ------------------------------------
+    // 2. VARIÁVEIS INTERNAS E CONTROLES
+    // ------------------------------------
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    let pixelSize = 8;
+    const minPixelSize = 1;
+    const maxPixelSize = 40;
+    let camX = 0, camY = 0;
+    let isPanning = false, panStart = null;
+    let isSelecting = false, selStart = null, selRect = null;
+    let owners = Object.values(OWNERS_DATA); 
+    const loadedImages = {}; 
+
+    // UI refs
+    const statsEl = document.getElementById('stats');
+    const soldCountEl = document.getElementById('soldCount');
+    const gridInfoEl = document.getElementById('gridInfo');
+    const totalPixelsBadge = document.getElementById('totalPixelsBadge');
+    const selectionInfoEl = document.getElementById('selection-info'); 
+    const tipUrlEl = document.getElementById('tip-url'); 
+
+    // --- Funções de Utilidade ---
+
+    function resizeCanvas(){
+        const rect = canvas.parentElement.getBoundingClientRect(); 
+        if (rect.width <= 0 || rect.height <= 0) return; 
+
+        canvas.width = Math.floor(rect.width * devicePixelRatio);
+        canvas.height = Math.floor(rect.height * devicePixelRatio);
+        ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+        draw();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+
+    function computeStats(){
+        owners = Object.values(OWNERS_DATA); 
+        let sold = owners.reduce((acc,b)=>acc+b.w*b.h,0);
+        soldCountEl.textContent = sold.toLocaleString('pt-BR');
+        statsEl.textContent = `Mostrando região — zoom: ${pixelSize}px | Total: ${TOTAL_PIXELS.toLocaleString('pt-BR')} pixels | Vendidos: ${sold.toLocaleString('pt-BR')}`;
+        gridInfoEl.textContent = `${GRID_W} x ${GRID_H} = ${TOTAL_PIXELS.toLocaleString('pt-BR')} pixels`;
+        totalPixelsBadge.textContent = `${TOTAL_PIXELS.toLocaleString('pt-BR')} pixels`;
+    }
+
+    function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+    function colorFromString(s) {
+        if (!s) return '#ff6b6b'; 
+        let hash = 0;
+        for (let i = 0; i < s.length; i++) {
+            hash = s.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        let color = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+        color = "00000".substring(0, 6 - color.length) + color;
+        return '#' + color;
+    }
+
+    function screenToGrid(clientX, clientY){
+        const rect = canvas.getBoundingClientRect();
+        const sx = (clientX - rect.left)*(canvas.width/rect.width)/devicePixelRatio;
+        const sy = (clientY - rect.top)*(canvas.height/rect.height)/devicePixelRatio;
+        const gx = Math.floor(camX + sx/pixelSize);
+        const gy = Math.floor(camY + sy/pixelSize);
+        return { gx: clamp(gx, 0, GRID_W-1), gy: clamp(gy, 0, GRID_H-1) };
+    }
+    
+    function getBlockAt(gridX, gridY) {
+        return owners.find(b => 
+            gridX >= b.x && gridX < b.x + b.w && 
+            gridY >= b.y && gridY < b.y + b.h
+        );
+    }
+
+    // --- Funções de Desenho e Interação ---
+
+    function updateSelectionDisplay(rect) {
+        if (!rect) {
+            selectionInfoEl.textContent = "Selecione uma área (Shift + Arrastar)";
+            selectionInfoEl.style.color = '#ffc107';
+            return;
+        }
+
+        const pixels = rect.w * rect.h;
+        const total = (pixels * PRICE_PER_PIXEL).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        
+        if (pixels < MIN_PIXEL_ORDER) {
+             selectionInfoEl.textContent = `Selecionado: ${pixels} pixels | Preço: ${total} | Mínimo: ${MIN_PIXEL_ORDER} pixels.`;
+             selectionInfoEl.style.color = '#ff6b6b'; 
+        } else {
+             selectionInfoEl.textContent = `Selecionado: ${pixels.toLocaleString('pt-BR')} pixels | Preço: ${total}`;
+             selectionInfoEl.style.color = '#10b981'; 
+        }
+    }
+
+    function draw(){
+        const vw = canvas.width / devicePixelRatio;
+        const vh = canvas.height / devicePixelRatio;
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0,0,vw,vh);
+
+        const startX = Math.floor(camX);
+        const startY = Math.floor(camY);
+        const cols = Math.ceil(vw / pixelSize) + 1;
+        const rows = Math.ceil(vh / pixelSize) + 1;
+
+        const minX = clamp(startX, 0, GRID_W-1);
+        const minY = clamp(startY, 0, GRID_H-1);
+        const maxX = clamp(startX + cols, 0, GRID_W);
+        const maxY = clamp(startY + rows, 0, GRID_H);
+
+        owners.forEach(block => {
+            const blockEndX = block.x + block.w;
+            const blockEndY = block.y + block.h;
+            
+            if (block.x > maxX || blockEndX < minX || block.y > maxY || blockEndY < minY) return;
+
+            const ox = (block.x - camX) * pixelSize;
+            const oy = (block.y - camY) * pixelSize;
+            const ow = block.w * pixelSize;
+            const oh = block.h * pixelSize;
+
+            if (block.imageUrl) {
+                let img = loadedImages[block.imageUrl];
+                if (!img) {
+                    img = new Image();
+                    img.crossOrigin = "anonymous";
+                    img.onload = () => {
+                        loadedImages[block.imageUrl] = img;
+                        draw(); 
+                    };
+                    img.src = block.imageUrl;
+                    loadedImages[block.imageUrl] = img; 
+                }
+                
+                if(img.complete) {
+                    ctx.drawImage(img, ox, oy, ow, oh);
+                } else {
+                    ctx.fillStyle = block.color || colorFromString(block.name);
+                    ctx.fillRect(Math.round(ox), Math.round(oy), Math.ceil(ow), Math.ceil(oh));
+                }
+            } else {
+                ctx.fillStyle = block.color || colorFromString(block.name);
+                ctx.fillRect(Math.round(ox), Math.round(oy), Math.ceil(ow), Math.ceil(oh));
+            }
+        });
+
+        if (pixelSize >= 6){
+            ctx.strokeStyle='rgba(0,0,0,0.06)';
+            ctx.lineWidth=1;
+            ctx.beginPath();
+            for (let cx=0; cx<=cols; cx++){
+                const x = Math.round((startX + cx - camX) * pixelSize)+0.5;
+                ctx.moveTo(x,0); ctx.lineTo(x,vh);
+            }
+            for (let ry=0; ry<=rows; ry++){
+                const y = Math.round((startY + ry - camY) * pixelSize)+0.5;
+                ctx.moveTo(0,y); ctx.lineTo(vw,y);
+            }
+            ctx.stroke();
+        }
+
+        if (selRect){
+            ctx.strokeStyle='#000';
+            ctx.lineWidth=2;
+            ctx.setLineDash([4,4]);
+            ctx.strokeRect(
+                Math.round((selRect.x-camX)*pixelSize)+0.5,
+                Math.round((selRect.y-camY)*pixelSize)+0.5,
+                Math.round(selRect.w*pixelSize),
+                Math.round(selRect.h*pixelSize)
+            );
+            ctx.setLineDash([]);
+        }
+
+        computeStats();
+        updateSelectionDisplay(selRect); 
+    }
+
+    canvas.addEventListener('mousedown', (ev)=>{
+        if (ev.button!==0) return;
+        const isShift = ev.shiftKey;
+        panStart={x:ev.clientX,y:ev.clientY,camX,camY};
+        if(isShift){
+            isSelecting=true;
+            const {gx,gy} = screenToGrid(ev.clientX, ev.clientY);
+            selStart={gx,gy};
+            selRect={x:gx,y:gy,w:1,h:1};
+        }else{isPanning=true;}
+        draw(); 
+    });
+
+    window.addEventListener('mousemove', (ev)=>{
+        
+        const {gx,gy} = screenToGrid(ev.clientX, ev.clientY); 
+        const block = getBlockAt(gx, gy);
+        
+        // --- LÓGICA DO TOOLTIP E CURSOR ---
+        if (block && (block.imageUrl || block.websiteUrl || block.name)) {
+            const urlToShow = block.websiteUrl || block.imageUrl || block.name;
+            tipUrlEl.textContent = `${block.name} — ${urlToShow}`;
+            tipUrlEl.classList.add('visible');
+            
+            // Adiciona a classe para mudar o cursor para "link" se houver websiteUrl
+            if (block.websiteUrl) {
+                canvas.classList.add('link-cursor');
+            } else {
+                canvas.classList.remove('link-cursor');
+            }
+            
+        } else {
+            tipUrlEl.classList.remove('visible');
+            canvas.classList.remove('link-cursor');
+        }
+        
+        // --- LÓGICA DE PANNING (ARRASTAR) ---
+        if(isPanning && panStart){
+            const dx=(ev.clientX-panStart.x)/pixelSize;
+            const dy=(ev.clientY-panStart.y)/pixelSize;
+            camX=clamp(panStart.camX-dx,0,Math.max(0,GRID_W-(canvas.width/devicePixelRatio)/pixelSize));
+            camY=clamp(panStart.camY-dy,0,Math.max(0,GRID_H-(canvas.height/devicePixelRatio)/pixelSize));
+            draw();
+        }
+        
+        // --- LÓGICA DE SELEÇÃO (SHIFT + ARRASTAR) ---
+        if(isSelecting && selStart){
+            const x=Math.min(selStart.gx,gx);
+            const y=Math.min(selStart.gy,gy);
+            const w=Math.abs(gx-selStart.gx)+1;
+            const h=Math.abs(gy-selStart.gy)+1;
+            selRect={x:clamp(x,0,GRID_W-1),y:clamp(y,0,GRID_H-1),w:clamp(w,1,GRID_W-x),h:clamp(h,1,GRID_H-y)};
+            draw(); 
+        }
+    });
+
+    window.addEventListener('mouseup', (ev)=>{
+        if (isPanning && panStart && Math.abs(ev.clientX - panStart.x) < 5 && Math.abs(ev.clientY - panStart.y) < 5 && !ev.shiftKey) {
+            const { gx, gy } = screenToGrid(ev.clientX, ev.clientY);
+            selRect = { x: gx, y: gy, w: 1, h: 1 };
+            draw();
+        }
+        if(isPanning){isPanning=false;panStart=null;}
+        if(isSelecting){isSelecting=false;}
+    });
+
+    canvas.addEventListener('wheel',(ev)=>{
+        ev.preventDefault();
+        const delta=Math.sign(ev.deltaY)*-1;
+        const oldSize=pixelSize;
+        if(delta>0) pixelSize=clamp(pixelSize*1.2,minPixelSize,maxPixelSize);
+        else pixelSize=clamp(pixelSize/1.2,minPixelSize,maxPixelSize);
+
+        const rect=canvas.getBoundingClientRect();
+        const sx=(ev.clientX-rect.left)*(canvas.width/rect.width)/devicePixelRatio;
+        const sy=(ev.clientY-rect.top)*(canvas.height/rect.height)/devicePixelRatio;
+        const gridXAtCursor = camX + sx/oldSize;
+        const gridYAtCursor = camY + sy/oldSize;
+        camX=clamp(gridXAtCursor - sx/pixelSize,0,Math.max(0,GRID_W-(canvas.width/devicePixelRatio)/pixelSize));
+        camY=clamp(gridYAtCursor - sy/pixelSize,0,Math.max(0,GRID_H-(canvas.height/devicePixelRatio)/pixelSize));
+        draw();
+    },{passive:false});
+
+    // ---------------------------------------------------
+    // NOVO LISTENER DE CLIQUE: ABRIR O LINK DO BLOCO
+    // ---------------------------------------------------
+    canvas.addEventListener('click', (ev) => {
+        // Ignora cliques se o usuário estava arrastando ou selecionando (para evitar cliques acidentais)
+        if (isPanning || isSelecting) return;
+        
+        const { gx, gy } = screenToGrid(ev.clientX, ev.clientY);
+        const block = getBlockAt(gx, gy);
+
+        if (block && block.websiteUrl) {
+            // Se o bloco existe e possui uma URL de site, abre em uma nova aba.
+            window.open(block.websiteUrl, '_blank');
+        }
+    });
+    
+    // --- Lógica de Pedido Manual ---
+
+    function initiateManualPurchase(rect){
+        const name=document.getElementById('buyerName').value.trim();
+        const urlInput=document.getElementById('imageUrl').value.trim(); 
+        
+        if(!name){
+            alert('Por favor, preencha o seu nome ou nome da empresa. Este campo é obrigatório.'); 
+            return;
+        }
+        
+        let freePixels = 0;
+        let isOverlapping = false;
+        
+        for (let yy = rect.y; yy < rect.y + rect.h; yy++) {
+            for (let xx = rect.x; xx < rect.x + rect.w; xx++) {
+                if (xx >= 0 && xx < GRID_W && yy >= 0 && yy < GRID_H) {
+                    const isOccupied = owners.some(b => 
+                        xx >= b.x && xx < b.x + b.w && 
+                        yy >= b.y && yy < b.y + b.h
+                    );
+                    if (isOccupied) {
+                        isOverlapping = true;
+                    } else {
+                        freePixels++;
+                    }
+                }
+            }
+        }
+
+        if (isOverlapping) {
+             alert('A área selecionada se sobrepõe a um pixel ou bloco já vendido. Por favor, selecione uma área livre.');
+             return;
+        }
+
+        if (freePixels === 0) { alert('Nenhum pixel disponível nesta área.'); return; }
+        
+        if (freePixels < MIN_PIXEL_ORDER) {
+            alert(`O pedido mínimo é de ${MIN_PIXEL_ORDER} pixels. Você selecionou apenas ${freePixels} pixels. Ajuste sua seleção.`);
+            return;
+        }
+
+        const totalPrice = freePixels * PRICE_PER_PIXEL;
+        const priceFormatted = totalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        
+        const coordText = rect.w === 1 && rect.h === 1
+            ? `Pixel: (${rect.x}, ${rect.y})`
+            : `Área: (${rect.x}, ${rect.y}) a (${rect.x + rect.w - 1}, ${rect.y + rect.h - 1})`;
+        
+        const subject = `PEDIDO DE COMPRA DE PIXEL: ${name} - R$ ${priceFormatted}`;
+        const body = `
+Olá,
+
+Gostaria de formalizar o pedido de compra de área no Muro Digital com as seguintes informações:
+
+- Nome do Comprador: ${name}
+- Tipo de Área: ${rect.w}x${rect.h}
+- Localização Selecionada (Coordenadas): ${coordText}
+- Quantidade de Pixels: ${freePixels}
+- URL da Imagem OU Site: ${urlInput || 'Não fornecido (Opcional)'}
+- Valor Total a Pagar: R$ ${priceFormatted}
+
+Por favor, confirme se a área está disponível e envie as instruções de pagamento.
+
+Obrigado!
+        `.trim();
+        
+        const YOUR_EMAIL = "contato.murodigital@gmail.com"; 
+
+        const mailtoLink = `mailto:${YOUR_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+        alert(`
+        PEDIDO PENDENTE DE ENVIO: R$ ${priceFormatted} para ${name}.
+        
+        CLIQUE OK para abrir seu programa de e-mail com a mensagem preenchida para ${YOUR_EMAIL}. 
+        Você só precisa ENVIAR.
+        
+        O mural será atualizado manualmente após a confirmação do pagamento.
+        `);
+        
+        window.location.href = mailtoLink;
+    }
+
+    document.getElementById('buyBlockBtn').addEventListener('click',()=>{
+        if(!selRect){alert('Selecione um pixel ou bloco usando SHIFT + Arrastar.'); return;}
+        initiateManualPurchase(selRect);
+    });
+
+    // --- Ferramentas ---
+
+    document.getElementById('resetBtn').addEventListener('click',()=>{
+        selRect = null;
+        draw();
+    });
+
+    function init(){
+        resizeCanvas();
+        computeStats();
+        draw();
+    }
+    init();
+})();
+</script>
+</body>
+</html>
