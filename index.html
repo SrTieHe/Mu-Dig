@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <title>Muro Digital — O Muro mais valioso da internet</title>
 <style>
     /* ------------------------------------------------ */
-    /* ESTILOS CSS REVISADOS E REFORÇADOS (ADAPTAÇÕES MOBILE) */
+    /* ESTILOS CSS REFORÇADOS (DESKTOP + MOBILE) */
     /* ------------------------------------------------ */
     :root {
         --ui-bg: #0f1720;
@@ -14,52 +14,54 @@
         --accent: #10b981; /* Verde Principal (Botão Comprar) */
         --muted: #bfc7cf;
         --reset-color: #60a5fa; /* Novo Azul para Reset */
+        --ui-mobile-height: 40vh; /* altura do painel no mobile (ajustável) */
     }
     
     html, body {
         height: 100%;
         margin: 0;
-        font-family: Inter, Segoe UI, Arial, sans-serif;
+        font-family: Inter, "Segoe UI", Arial, sans-serif;
         background: linear-gradient(180deg, #071021, #0f1720);
         color: #e6eef6;
-        overflow-x: hidden;
+        overflow: hidden; /* evitamos rolagem da página; painel terá overflow interno */
     }
 
     #app {
         display: flex;
-        height: 100vh;
+        height: 100dvh; /* usa a altura real da viewport no mobile */
         width: 100%;
     }
     
+    /* ------------------------------------------------
+       LEFT: área do mural (canvas)
+       ------------------------------------------------ */
     #left {
         flex: 1; 
         position: relative;
         overflow: hidden;
         width: 100%;
         height: 100%;
+        background: #ffffff;
     }
     
+    /* canvas preenche o #left */
     #canvas {
         position: absolute;
-        top: 0;
-        left: 0;
+        inset: 0; /* top:0; left:0; right:0; bottom:0 */
         width: 100%;
         height: 100%;
         background: #ffffff;
         display: block;
         cursor: grab; /* Mão de arrasto */
-        touch-action: none; /* bloqueia comportamento padrão de scroll/pinch do navegador */
+        touch-action: none; /* impede gestos nativos do navegador (pinch scroll) */
     }
     
-    #canvas:active {
-        cursor: grabbing;
-    }
-    
-    /* Cursor de link quando estiver sobre um bloco que pode ser clicado */
-    #canvas.link-cursor {
-        cursor: pointer;
-    }
-    
+    #canvas:active { cursor: grabbing; }
+    #canvas.link-cursor { cursor: pointer; }
+
+    /* ------------------------------------------------
+       UI: painel lateral / inferior
+       ------------------------------------------------ */
     #ui {
         width: 360px;
         min-width: 300px;
@@ -70,150 +72,59 @@
         overflow-y: auto;
     }
 
-    h1 {
-        margin: 0 0 8px 0;
-        font-size: 18px;
-        color: var(--accent);
-    }
-    
-    .stat {
-        margin: 8px 0;
-        color: var(--muted);
-        font-size: 14px;
-    }
-    
-    label {
-        display: block;
-        margin: 8px 0 4px;
-        color: #cfe6d7;
-    }
-    
-    .row {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-    }
-    
-    button {
-        background: var(--accent);
-        border: 0;
-        padding: 8px 10px;
-        border-radius: 6px;
-        color: #042018;
-        cursor: pointer;
-        flex-grow: 1; 
-    }
-    
-    button.reset-ghost {
-        background: transparent;
-        border: 1px solid var(--reset-color);
-        color: var(--reset-color);
-        transition: background-color 0.2s;
-    }
+    h1 { margin: 0 0 8px 0; font-size: 18px; color: var(--accent); text-align: left; }
+    .stat { margin: 8px 0; color: var(--muted); font-size: 14px; }
+    label { display: block; margin: 8px 0 4px; color: #cfe6d7; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    button { background: var(--accent); border: 0; padding: 8px 10px; border-radius: 6px; color: #042018; cursor: pointer; flex-grow: 1; }
+    button.reset-ghost { background: transparent; border: 1px solid var(--reset-color); color: var(--reset-color); transition: background-color 0.2s; }
+    button.reset-ghost:hover { background-color: rgba(96,165,250,0.08); }
+    input, select { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); background: transparent; color: var(--muted); }
+    small { color: #9fb3a2; }
+    #legend { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .badge { padding: 6px 8px; border-radius: 6px; background: rgba(255,255,255,0.03); font-size: 13px; }
+    footer { position: absolute; left: 12px; bottom: 12px; color: #9fb3a2; font-size: 13px; }
+    #selection-info { font-size: 14px; color: #ffc107; margin: 8px 0; padding: 4px; border: 1px dashed rgba(255,255,255,0.1); border-radius: 4px; text-align: center; }
+    #tip-url { position: absolute; bottom: 35px; left: 10px; background: rgba(0,0,0,0.85); color: white; padding: 6px 10px; border-radius: 4px; font-size: 13px; max-width: 90%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; z-index: 1000; pointer-events: none; opacity: 0; transition: opacity 0.2s; }
+    #tip-url.visible { opacity: 1; }
 
-    button.reset-ghost:hover {
-        background-color: rgba(96, 165, 250, 0.1); 
-    }
-    
-    input,
-    select {
-        width: 100%;
-        padding: 8px;
-        border-radius: 6px;
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        background: transparent;
-        color: var(--muted);
-    }
-    
-    small {
-        color: #9fb3a2;
-    }
-    
-    #legend {
-        display: flex;
-        gap: 8px;
-        margin-top: 10px;
-        flex-wrap: wrap;
-    }
-    
-    .badge {
-        padding: 6px 8px;
-        border-radius: 6px;
-        background: rgba(255, 255, 255, 0.03);
-        font-size: 13px;
-    }
-    
-    footer {
-        position: absolute;
-        left: 12px;
-        bottom: 12px;
-        color: #9fb3a2;
-        font-size: 13px;
-    }
-    
-    #selection-info {
-        font-size: 14px;
-        color: #ffc107; 
-        margin: 8px 0;
-        padding: 4px;
-        border: 1px dashed rgba(255, 255, 255, 0.1);
-        border-radius: 4px;
-        text-align: center;
-    }
-    
-    /* ------------------------------------------------ */
-    /* ESTILO PARA O MOSTRADOR FLUTUANTE (TOOLTIP) */
-    /* ------------------------------------------------ */
-    #tip-url {
-        position: absolute;
-        bottom: 35px; 
-        left: 10px;
-        background: rgba(0, 0, 0, 0.85);
-        color: white;
-        padding: 6px 10px;
-        border-radius: 4px;
-        font-size: 13px;
-        max-width: 90%;
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-        z-index: 1000; 
-        pointer-events: none; 
-        opacity: 0;
-        transition: opacity 0.2s;
-    }
-
-    #tip-url.visible {
-        opacity: 1;
-    }
-
-    /* ----------------------------
-       ADAPTAÇÃO MOBILE (RESPONSIVO)
-       ---------------------------- */
+    /* ------------------------------------------------
+       MOBILE: painel fixo na parte inferior e area do canvas ajustada
+       ------------------------------------------------ */
     @media (max-width: 768px) {
         #app {
             flex-direction: column;
-            height: 100vh;
+            height: 100dvh;
         }
+        /* left ficará com altura calculada para não ser encoberto pelo painel */
         #left {
-            height: 65vh;
+            height: calc(100dvh - var(--ui-mobile-height));
         }
+        /* painel fixo no rodapé */
         #ui {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
             width: 100%;
-            min-width: unset;
-            height: auto;
-            overflow-y: auto;
-            position: relative;
+            height: var(--ui-mobile-height);
+            max-height: 70vh;
+            box-shadow: 0 -8px 24px rgba(0,0,0,0.6);
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
             padding: 12px;
+            z-index: 1500;
+            overflow-y: auto;
         }
-        footer {
-            position: relative;
-            left: unset;
-            bottom: unset;
-            text-align: center;
-            margin-top: 8px;
-        }
-        h1 { text-align: center; }
+        /* empurra o conteúdo do canvas um pouco para cima do painel no mobile */
+        #tip-url { bottom: calc(var(--ui-mobile-height) + 12px); left: 12px; right: 12px; max-width: calc(100% - 24px); }
+        footer { position: relative; left: unset; bottom: unset; text-align: center; margin-top: 6px; color: #9fb3a2; }
+        h1 { font-size: 16px; text-align: center; }
+    }
+
+    /* pequenos ajustes para telas muito pequenas */
+    @media (max-width: 420px) {
+        :root { --ui-mobile-height: 46vh; } /* mais espaço para o painel em telas estreitas */
     }
 </style>
 </head>
@@ -221,10 +132,11 @@
 <div id="app">
     <div id="left">
         <canvas id="canvas"></canvas>
-        <div id="tip-url"></div> 
+        <div id="tip-url"></div>
         <footer>Zoom: mousewheel • Arraste para navegar • Shift+Arraste para selecionar</footer>
     </div>
-    <div id="ui">
+
+    <div id="ui" role="region" aria-label="Painel de compra">
         <h1>Muro Digital — O Muro mais valioso da internet</h1>
         <div class="stat" id="stats">Carregando...</div>
 
@@ -283,7 +195,7 @@
     const MIN_PIXEL_ORDER = 150; 
 
     /**
-     * Objeto de Dados de Proprietários
+     * Objeto de Dados de Proprietários: VOCÊ EDITA ESTE OBJETO MANUALMENTE
      */
     let OWNERS_DATA = {
         "colorado-sul-1": { 
@@ -322,6 +234,7 @@
     // --- Funções de Utilidade ---
 
     function resizeCanvas(){
+        // ajusta o tamanho do canvas para o container (#left)
         const rect = canvas.parentElement.getBoundingClientRect(); 
         if (rect.width <= 0 || rect.height <= 0) return; 
 
@@ -331,7 +244,8 @@
         draw();
     }
     window.addEventListener('resize', resizeCanvas);
-
+    // Também recalcula quando a orientação muda
+    window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 250));
 
     function computeStats(){
         owners = Object.values(OWNERS_DATA); 
@@ -581,13 +495,12 @@
     // ---------------------------
     // TOUCH (mobile / tablet)
     // ---------------------------
-    // Implementação:
     // - 1 dedo: pan (arrastar)
     // - long-press (~300ms) sem mover -> inicia seleção (como Shift+drag)
     // - toque rápido -> seleciona 1 pixel (click)
     // - 2 dedos: pinch para zoom (mantém o ponto focal)
     let touchState = {
-        mode: null, // 'pan' | 'pinch' | 'select'
+        mode: null, // 'pending' | 'pan' | 'pinch' | 'select'
         panStart: null,
         longPressTimer: null,
         longPressThreshold: 300,
@@ -606,16 +519,13 @@
 
     canvas.addEventListener('touchstart', (ev) => {
         if (ev.touches.length === 1) {
-            // possível pan ou long-press (seleção)
             const t = ev.touches[0];
             touchState.mode = 'pending';
             touchState.lastTouchPos = { x: t.clientX, y: t.clientY, time: Date.now() };
             touchState.panStart = { x: t.clientX, y: t.clientY, camX, camY };
 
-            // inicia timer de long-press para seleção
             clearTimeout(touchState.longPressTimer);
             touchState.longPressTimer = setTimeout(() => {
-                // iniciar seleção se não houve movimento significativo
                 touchState.mode = 'select';
                 isSelecting = true;
                 const { gx, gy } = screenToGrid(t.clientX, t.clientY);
@@ -624,7 +534,6 @@
                 draw();
             }, touchState.longPressThreshold);
         } else if (ev.touches.length === 2) {
-            // pinch start
             clearTimeout(touchState.longPressTimer);
             touchState.mode = 'pinch';
             const dx = ev.touches[0].clientX - ev.touches[1].clientX;
@@ -642,9 +551,7 @@
             const dy = t.clientY - touchState.panStart.y;
             const moveDist = Math.hypot(dx, dy);
 
-            // se já estamos em 'select' -> atualiza seleção
             if (touchState.mode === 'select' || isSelecting) {
-                // cancela timer (caso ainda exista)
                 clearTimeout(touchState.longPressTimer);
                 touchState.mode = 'select';
                 const { gx, gy } = screenToGrid(t.clientX, t.clientY);
@@ -662,12 +569,10 @@
                 return;
             }
 
-            // se movimento > threshold antes do long-press => é pan
             if (moveDist > 8) {
                 clearTimeout(touchState.longPressTimer);
                 touchState.mode = 'pan';
                 isPanning = true;
-                // aplicar panning
                 const dxGrid = (t.clientX - touchState.panStart.x) / pixelSize;
                 const dyGrid = (t.clientY - touchState.panStart.y) / pixelSize;
                 camX = clamp(touchState.panStart.camX - dxGrid, 0, Math.max(0, GRID_W - (canvas.width/devicePixelRatio)/pixelSize));
@@ -682,7 +587,6 @@
             const zoomFactor = newDist / touchState.touchStartDist;
             const newPixelSize = clamp(touchState.initialPixelSize * zoomFactor, minPixelSize, maxPixelSize);
 
-            // calcula o ponto focal para manter o centro do pinch
             const newCenter = getTouchCenter(ev.touches);
             const rect = canvas.getBoundingClientRect();
             const sx = (newCenter.x - rect.left)*(canvas.width/rect.width)/devicePixelRatio;
@@ -700,17 +604,14 @@
     }, { passive: false });
 
     canvas.addEventListener('touchend', (ev) => {
-        // se foi um tap curto (sem long-press e sem panning), seleciona 1 pixel (simula clique)
         clearTimeout(touchState.longPressTimer);
 
         if (touchState.mode === 'pending') {
-            // toque curto -> tratar como click
             const last = touchState.lastTouchPos;
             if (last) {
                 const dt = Date.now() - last.time;
                 if (dt < 300) {
                     const { gx, gy } = screenToGrid(last.x, last.y);
-                    // se sobre um bloco com website -> abrir (mantendo comportamento de click em desktop)
                     const block = getBlockAt(gx, gy);
                     if (block && block.websiteUrl) {
                         window.open(block.websiteUrl, '_blank');
@@ -722,15 +623,13 @@
             }
         }
 
-        // reset state
         touchState.mode = null;
         touchState.panStart = null;
         touchState.lastTouchPos = null;
         isPanning = false;
-        // se estava em seleção via touch, encerra seleção
+
         if (isSelecting && selRect) {
-            // deixa selRect como está (usuário pode enviar pedido)
-            isSelecting = false; // finaliza a interação de seleção (permite ao usuário confirmar)
+            isSelecting = false;
             selStart = null;
             draw();
         }
@@ -820,7 +719,7 @@ Obrigado!
     }
 
     document.getElementById('buyBlockBtn').addEventListener('click',()=>{
-        if(!selRect){alert('Selecione um pixel ou bloco usando SHIFT + Arrastar (ou long-press no celular).'); return;}
+        if(!selRect){alert('Selecione um pixel ou bloco usando SHIFT + Arrastar (ou mantenha pressionado no celular).'); return;}
         initiateManualPurchase(selRect);
     });
 
