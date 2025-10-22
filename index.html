@@ -6,7 +6,7 @@
 <title>Muro Digital — O Muro mais valioso da internet</title>
 <style>
     /* ------------------------------------------------ */
-    /* ESTILOS CSS REVISADOS E REFORÇADOS */
+    /* ESTILOS CSS REVISADOS E REFORÇADOS (ADAPTAÇÕES MOBILE) */
     /* ------------------------------------------------ */
     :root {
         --ui-bg: #0f1720;
@@ -48,6 +48,7 @@
         background: #ffffff;
         display: block;
         cursor: grab; /* Mão de arrasto */
+        touch-action: none; /* bloqueia comportamento padrão de scroll/pinch do navegador */
     }
     
     #canvas:active {
@@ -185,6 +186,35 @@
     #tip-url.visible {
         opacity: 1;
     }
+
+    /* ----------------------------
+       ADAPTAÇÃO MOBILE (RESPONSIVO)
+       ---------------------------- */
+    @media (max-width: 768px) {
+        #app {
+            flex-direction: column;
+            height: 100vh;
+        }
+        #left {
+            height: 65vh;
+        }
+        #ui {
+            width: 100%;
+            min-width: unset;
+            height: auto;
+            overflow-y: auto;
+            position: relative;
+            padding: 12px;
+        }
+        footer {
+            position: relative;
+            left: unset;
+            bottom: unset;
+            text-align: center;
+            margin-top: 8px;
+        }
+        h1 { text-align: center; }
+    }
 </style>
 </head>
 <body>
@@ -253,31 +283,17 @@
     const MIN_PIXEL_ORDER = 150; 
 
     /**
-     * Objeto de Dados de Proprietários: VOCÊ EDITA ESTE OBJETO MANUALMENTE
-     * * FORMATO:
-     * "bloco1": { 
-     * x: (Coordenada X inicial), 
-     * y: (Coordenada Y inicial), 
-     * w: (Largura), 
-     * h: (Altura), 
-     * name: "Nome da Marca", 
-     * imageUrl: "URL da imagem (ex: .png ou .jpg) | Opcional, se vazio usa cor", 
-     * websiteUrl: "Link do site para o CLIQUE (Opcional)"
-     * }
+     * Objeto de Dados de Proprietários
      */
     let OWNERS_DATA = {
-        // =================================================================
-        // BLOCOS DE VENDA (PREENCHA AQUI!)
-        // Lembre-se de trocar as URLs de exemplo pelas URLs reais do cliente.
-        // =================================================================
         "colorado-sul-1": { 
             x: 31, 
             y: 7, 
             w: 62, 
             h: 39, 
             name: "Colorado Sul", 
-            imageUrl: "https://raw.githubusercontent.com/SrTieHe/Mu-Dig/refs/heads/main/Colorado%20Sul%202023-%20Fundo%20Gelo%20(1).png", // 1. A URL que renderiza a imagem no mural:
-            websiteUrl: "https://www.coloradosul.com.br" // 2. O link do site que será exibido no tooltip:
+            imageUrl: "https://raw.githubusercontent.com/SrTieHe/Mu-Dig/refs/heads/main/Colorado%20Sul%202023-%20Fundo%20Gelo%20(1).png",
+            websiteUrl: "https://www.coloradosul.com.br"
         }
     }; 
 
@@ -460,6 +476,9 @@
         updateSelectionDisplay(selRect); 
     }
 
+    // -------------------------
+    // MOUSE (desktop) HANDLERS
+    // -------------------------
     canvas.addEventListener('mousedown', (ev)=>{
         if (ev.button!==0) return;
         const isShift = ev.shiftKey;
@@ -558,8 +577,166 @@
             window.open(block.websiteUrl, '_blank');
         }
     });
-    
-    // --- Lógica de Pedido Manual ---
+
+    // ---------------------------
+    // TOUCH (mobile / tablet)
+    // ---------------------------
+    // Implementação:
+    // - 1 dedo: pan (arrastar)
+    // - long-press (~300ms) sem mover -> inicia seleção (como Shift+drag)
+    // - toque rápido -> seleciona 1 pixel (click)
+    // - 2 dedos: pinch para zoom (mantém o ponto focal)
+    let touchState = {
+        mode: null, // 'pan' | 'pinch' | 'select'
+        panStart: null,
+        longPressTimer: null,
+        longPressThreshold: 300,
+        touchStartDist: 0,
+        initialPixelSize: pixelSize,
+        lastTouchCenter: null,
+        lastTouchPos: null
+    };
+
+    function getTouchCenter(touches){
+        return {
+            x: (touches[0].clientX + touches[1].clientX) / 2,
+            y: (touches[0].clientY + touches[1].clientY) / 2
+        };
+    }
+
+    canvas.addEventListener('touchstart', (ev) => {
+        if (ev.touches.length === 1) {
+            // possível pan ou long-press (seleção)
+            const t = ev.touches[0];
+            touchState.mode = 'pending';
+            touchState.lastTouchPos = { x: t.clientX, y: t.clientY, time: Date.now() };
+            touchState.panStart = { x: t.clientX, y: t.clientY, camX, camY };
+
+            // inicia timer de long-press para seleção
+            clearTimeout(touchState.longPressTimer);
+            touchState.longPressTimer = setTimeout(() => {
+                // iniciar seleção se não houve movimento significativo
+                touchState.mode = 'select';
+                isSelecting = true;
+                const { gx, gy } = screenToGrid(t.clientX, t.clientY);
+                selStart = { gx, gy };
+                selRect = { x: gx, y: gy, w: 1, h: 1 };
+                draw();
+            }, touchState.longPressThreshold);
+        } else if (ev.touches.length === 2) {
+            // pinch start
+            clearTimeout(touchState.longPressTimer);
+            touchState.mode = 'pinch';
+            const dx = ev.touches[0].clientX - ev.touches[1].clientX;
+            const dy = ev.touches[0].clientY - ev.touches[1].clientY;
+            touchState.touchStartDist = Math.hypot(dx, dy);
+            touchState.initialPixelSize = pixelSize;
+            touchState.lastTouchCenter = getTouchCenter(ev.touches);
+        }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (ev) => {
+        if (ev.touches.length === 1 && (touchState.mode === 'pending' || touchState.mode === 'pan' || touchState.mode === 'select')) {
+            const t = ev.touches[0];
+            const dx = t.clientX - touchState.panStart.x;
+            const dy = t.clientY - touchState.panStart.y;
+            const moveDist = Math.hypot(dx, dy);
+
+            // se já estamos em 'select' -> atualiza seleção
+            if (touchState.mode === 'select' || isSelecting) {
+                // cancela timer (caso ainda exista)
+                clearTimeout(touchState.longPressTimer);
+                touchState.mode = 'select';
+                const { gx, gy } = screenToGrid(t.clientX, t.clientY);
+                if (!selStart) {
+                    selStart = screenToGrid(t.clientX, t.clientY);
+                    selRect = { x: selStart.gx, y: selStart.gy, w: 1, h: 1 };
+                } else {
+                    const x = Math.min(selStart.gx, gx);
+                    const y = Math.min(selStart.gy, gy);
+                    const w = Math.abs(gx - selStart.gx) + 1;
+                    const h = Math.abs(gy - selStart.gy) + 1;
+                    selRect = { x: clamp(x, 0, GRID_W-1), y: clamp(y,0,GRID_H-1), w: clamp(w,1,GRID_W-x), h: clamp(h,1,GRID_H-y) };
+                }
+                draw();
+                return;
+            }
+
+            // se movimento > threshold antes do long-press => é pan
+            if (moveDist > 8) {
+                clearTimeout(touchState.longPressTimer);
+                touchState.mode = 'pan';
+                isPanning = true;
+                // aplicar panning
+                const dxGrid = (t.clientX - touchState.panStart.x) / pixelSize;
+                const dyGrid = (t.clientY - touchState.panStart.y) / pixelSize;
+                camX = clamp(touchState.panStart.camX - dxGrid, 0, Math.max(0, GRID_W - (canvas.width/devicePixelRatio)/pixelSize));
+                camY = clamp(touchState.panStart.camY - dyGrid, 0, Math.max(0, GRID_H - (canvas.height/devicePixelRatio)/pixelSize));
+                draw();
+            }
+        } else if (ev.touches.length === 2 && touchState.mode === 'pinch') {
+            ev.preventDefault();
+            const dx = ev.touches[0].clientX - ev.touches[1].clientX;
+            const dy = ev.touches[0].clientY - ev.touches[1].clientY;
+            const newDist = Math.hypot(dx, dy);
+            const zoomFactor = newDist / touchState.touchStartDist;
+            const newPixelSize = clamp(touchState.initialPixelSize * zoomFactor, minPixelSize, maxPixelSize);
+
+            // calcula o ponto focal para manter o centro do pinch
+            const newCenter = getTouchCenter(ev.touches);
+            const rect = canvas.getBoundingClientRect();
+            const sx = (newCenter.x - rect.left)*(canvas.width/rect.width)/devicePixelRatio;
+            const sy = (newCenter.y - rect.top)*(canvas.height/rect.height)/devicePixelRatio;
+            const oldSize = pixelSize;
+            const gridXAtCursor = camX + sx/oldSize;
+            const gridYAtCursor = camY + sy/oldSize;
+
+            pixelSize = newPixelSize;
+
+            camX = clamp(gridXAtCursor - sx/pixelSize, 0, Math.max(0, GRID_W - (canvas.width/devicePixelRatio)/pixelSize));
+            camY = clamp(gridYAtCursor - sy/pixelSize, 0, Math.max(0, GRID_H - (canvas.height/devicePixelRatio)/pixelSize));
+            draw();
+        }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (ev) => {
+        // se foi um tap curto (sem long-press e sem panning), seleciona 1 pixel (simula clique)
+        clearTimeout(touchState.longPressTimer);
+
+        if (touchState.mode === 'pending') {
+            // toque curto -> tratar como click
+            const last = touchState.lastTouchPos;
+            if (last) {
+                const dt = Date.now() - last.time;
+                if (dt < 300) {
+                    const { gx, gy } = screenToGrid(last.x, last.y);
+                    // se sobre um bloco com website -> abrir (mantendo comportamento de click em desktop)
+                    const block = getBlockAt(gx, gy);
+                    if (block && block.websiteUrl) {
+                        window.open(block.websiteUrl, '_blank');
+                    } else {
+                        selRect = { x: gx, y: gy, w: 1, h: 1 };
+                        draw();
+                    }
+                }
+            }
+        }
+
+        // reset state
+        touchState.mode = null;
+        touchState.panStart = null;
+        touchState.lastTouchPos = null;
+        isPanning = false;
+        // se estava em seleção via touch, encerra seleção
+        if (isSelecting && selRect) {
+            // deixa selRect como está (usuário pode enviar pedido)
+            isSelecting = false; // finaliza a interação de seleção (permite ao usuário confirmar)
+            selStart = null;
+            draw();
+        }
+    });
+
+    // --- Lógica de Pedido Manual (mantida igual) ---
 
     function initiateManualPurchase(rect){
         const name=document.getElementById('buyerName').value.trim();
@@ -643,7 +820,7 @@ Obrigado!
     }
 
     document.getElementById('buyBlockBtn').addEventListener('click',()=>{
-        if(!selRect){alert('Selecione um pixel ou bloco usando SHIFT + Arrastar.'); return;}
+        if(!selRect){alert('Selecione um pixel ou bloco usando SHIFT + Arrastar (ou long-press no celular).'); return;}
         initiateManualPurchase(selRect);
     });
 
@@ -660,7 +837,6 @@ Obrigado!
         draw();
     }
     init();
-    
 })();
 </script>
 </body>
